@@ -52,11 +52,11 @@ constitutional-ai-data-pipeline/
 git clone <repository-url>
 cd constitutional-ai-data-pipeline
 
-# Install basic dependencies
-pip install vllm transformers pandas pyarrow tqdm
-
-# Or install from pyproject.toml
+# Install package (recommended for production)
 pip install -e .
+
+# Optional dev tools
+pip install -e .[dev]
 ```
 
 ## Basic Usage
@@ -65,7 +65,10 @@ pip install -e .
 
 ```bash
 # Basic usage with default configuration
-python main.py --constitution_path constitutions/constitution_anthropic.json --max_samples 128
+cai-pipeline --max_samples 128
+
+# Alternative entrypoint
+python main.py --max_samples 128
 ```
 
 ### Advanced Configuration
@@ -73,6 +76,16 @@ python main.py --constitution_path constitutions/constitution_anthropic.json --m
 ```bash
 # Custom complete pipeline
 python main.py \
+    --model "dphn/dolphin-2.9.1-llama-3-70b" \
+    --constitution_path "constitutions/constitution_anthropic.json" \
+    --max_samples 512 \
+    --batch_size 32 \
+    --gpus "0,1,2,3" \
+    --temperature 0.8 \
+    --max_new_tokens 1500
+
+  # Equivalent with installed CLI
+  cai-pipeline \
     --model "dphn/dolphin-2.9.1-llama-3-70b" \
     --constitution_path "constitutions/constitution_anthropic.json" \
     --max_samples 512 \
@@ -258,6 +271,13 @@ python main.py \
 - **Reusability**: Reusable components in other projects
 
 ## Ethical Considerations
+
+## Production Notes
+
+- The pipeline validates all critical arguments at startup (paths, sampling ranges, GPU config).
+- If no red-teaming prompts are available after filtering, execution fails fast with a clear error.
+- Output files are always written under `output_dir/exps/` with timestamped names.
+- Install from `pyproject.toml` to ensure compatible dependency versions.
 
 This pipeline is specifically designed to:
 

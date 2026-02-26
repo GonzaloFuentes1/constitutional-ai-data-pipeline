@@ -7,6 +7,7 @@ Pipeline principal de Constitutional AI.
 
 import os
 import random
+import math
 from typing import List, Dict, Any
 
 from config import Args
@@ -30,7 +31,6 @@ from utils import (
     build_chat_with_fewshots,
     chats_to_prompts,
     chunked,
-    parse_gpu_config
 )
 
 
@@ -106,8 +106,9 @@ class ConstitutionalAIPipeline:
         
         # Procesar en lotes
         init_responses: List[str] = []
-        for i, batch_chats in enumerate(chunked(chats_stage1, self.args.batch_size)):
-            print(f"  Procesando lote {i+1}/{len(red_prompts)//self.args.batch_size + 1}")
+        total_batches = math.ceil(len(red_prompts) / self.args.batch_size)
+        for i, batch_chats in enumerate(chunked(chats_stage1, self.args.batch_size), start=1):
+            print(f"  Procesando lote {i}/{total_batches}")
             prompts = chats_to_prompts(self.tokenizer, batch_chats)
             completions = run_vllm_generate(self.llm, self.sampling_params, prompts)
             init_responses.extend(completions)
@@ -148,8 +149,9 @@ class ConstitutionalAIPipeline:
         
         # Procesar en lotes
         critic_responses: List[str] = []
-        for i, batch_chats in enumerate(chunked(chats_stage2, self.args.batch_size)):
-            print(f"  Procesando lote {i+1}/{len(red_prompts)//self.args.batch_size + 1}")
+        total_batches = math.ceil(len(red_prompts) / self.args.batch_size)
+        for i, batch_chats in enumerate(chunked(chats_stage2, self.args.batch_size), start=1):
+            print(f"  Procesando lote {i}/{total_batches}")
             prompts = chats_to_prompts(self.tokenizer, batch_chats)
             completions = run_vllm_generate(self.llm, self.sampling_params, prompts)
             critic_responses.extend(completions)
@@ -197,8 +199,9 @@ class ConstitutionalAIPipeline:
         
         # Procesar en lotes
         revision_responses: List[str] = []
-        for i, batch_chats in enumerate(chunked(chats_stage3, self.args.batch_size)):
-            print(f"  Procesando lote {i+1}/{len(red_prompts)//self.args.batch_size + 1}")
+        total_batches = math.ceil(len(red_prompts) / self.args.batch_size)
+        for i, batch_chats in enumerate(chunked(chats_stage3, self.args.batch_size), start=1):
+            print(f"  Procesando lote {i}/{total_batches}")
             prompts = chats_to_prompts(self.tokenizer, batch_chats)
             completions = run_vllm_generate(self.llm, self.sampling_params, prompts)
             revision_responses.extend(completions)
@@ -293,6 +296,11 @@ class ConstitutionalAIPipeline:
         
         # Cargar prompts de red teaming
         red_prompts = self.load_red_teaming_prompts()
+        if not red_prompts:
+            raise ValueError(
+                "No hay prompts de red teaming para procesar. "
+                "Revisa --red_teaming_parquet, --red_prompts_path o --max_samples."
+            )
         
         # Etapa 1: Respuestas iniciales
         init_responses = self.stage_1_initial_response(red_prompts)

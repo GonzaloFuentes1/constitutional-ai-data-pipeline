@@ -30,11 +30,45 @@ def load_constitution(path: str) -> Dict[str, Any]:
     
     if "constitutions" not in data or not isinstance(data["constitutions"], list):
         raise ValueError("El JSON debe contener una lista 'constitutions'.")
+    if not data["constitutions"]:
+        raise ValueError("La lista 'constitutions' no puede estar vacía.")
+
+    for idx, item in enumerate(data["constitutions"]):
+        if not isinstance(item, dict):
+            raise ValueError(f"'constitutions[{idx}]' debe ser un objeto.")
+        if "critic" not in item or "revision" not in item:
+            raise ValueError(
+                f"'constitutions[{idx}]' debe contener las claves 'critic' y 'revision'."
+            )
+        if not isinstance(item["critic"], str) or not item["critic"].strip():
+            raise ValueError(f"'constitutions[{idx}].critic' debe ser string no vacío.")
+        if not isinstance(item["revision"], str) or not item["revision"].strip():
+            raise ValueError(f"'constitutions[{idx}].revision' debe ser string no vacío.")
     
     # few_shot_examples es opcional
     if "few_shot_examples" in data:
         if not isinstance(data["few_shot_examples"], list):
             raise ValueError("'few_shot_examples' debe ser una lista de conversaciones.")
+        for conv_idx, conv in enumerate(data["few_shot_examples"]):
+            if not isinstance(conv, list):
+                raise ValueError(f"'few_shot_examples[{conv_idx}]' debe ser una lista de mensajes.")
+            for msg_idx, msg in enumerate(conv):
+                if not isinstance(msg, dict):
+                    raise ValueError(
+                        f"'few_shot_examples[{conv_idx}][{msg_idx}]' debe ser un objeto."
+                    )
+                if "role" not in msg or "content" not in msg:
+                    raise ValueError(
+                        f"'few_shot_examples[{conv_idx}][{msg_idx}]' debe contener 'role' y 'content'."
+                    )
+                if msg["role"] not in {"user", "assistant", "system"}:
+                    raise ValueError(
+                        f"'few_shot_examples[{conv_idx}][{msg_idx}].role' inválido: {msg['role']}"
+                    )
+                if not isinstance(msg["content"], str):
+                    raise ValueError(
+                        f"'few_shot_examples[{conv_idx}][{msg_idx}].content' debe ser string."
+                    )
     else:
         data["few_shot_examples"] = []
     

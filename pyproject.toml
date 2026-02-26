@@ -13,21 +13,27 @@ readme = "README.md"
 license = "Apache-2.0"
 requires-python = ">=3.10"
 dependencies = [
-    "llm-swarm",
+    "vllm",
+    "numpy<2",
     "transformers>=4.30.0",
     "huggingface_hub>=0.15.0",
     "pandas>=2.0.0",
-    "datasets>=2.12.0",
+    "pyarrow>=12.0.0",
     "tqdm>=4.65.0",
 ]
 
-[tool.setuptools.packages.find]
-where = ["src"]
-include = ["*"]
-exclude = ["tests*"]
+[project.scripts]
+cai-pipeline = "main:main"
 
-[tool.setuptools.package-dir]
-"" = "src"
+[tool.setuptools]
+py-modules = [
+    "main",
+    "config",
+    "pipeline",
+    "data_handler",
+    "model_manager",
+    "utils",
+]
 
 [project.optional-dependencies]
 dev = [

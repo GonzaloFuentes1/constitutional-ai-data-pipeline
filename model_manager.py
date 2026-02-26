@@ -8,6 +8,9 @@ Gestión de modelos, tokenizers y generación para el pipeline Constitutional AI
 import os
 from typing import List
 
+os.environ.setdefault("TRANSFORMERS_NO_TF", "1")
+os.environ.setdefault("USE_TF", "0")
+
 from vllm import LLM, SamplingParams
 from transformers import AutoTokenizer
 
