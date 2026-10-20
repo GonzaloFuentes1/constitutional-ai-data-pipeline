@@ -16,7 +16,7 @@ This pipeline implements Anthropic's Constitutional AI methodology to create hig
 - **Batch processing**: Massive parallel generation with vLLM
 - **Few-shot learning**: Contextual examples during inference
 - **Ethical principles**: Multiple constitutions with different approaches
-- **Multiple formats**: Output in JSON, JSONL and Parquet
+- **Multiple formats**: Output in JSON and Parquet
 - **Multi-GPU support**: Complete support for distributed inference
 - **Ready datasets**: Prepared for SFT and preference training
 
@@ -35,7 +35,7 @@ constitutional-ai-data-pipeline/
 │   ├── constitution_anthropic.json
 │   ├── constitution_simple.json
 │   └── constitution_few.json
-└── models/                # Locally downloaded models
+└── models/                # Locally downloaded models (created at run time, git-ignored)
 ```
 
 ## Installation
@@ -110,15 +110,25 @@ python main.py \
 | Parameter | Description | Default Value |
 |-----------|-------------|---------------|
 | `--model` | Hugging Face model to use | `dphn/dolphin-2.9.1-llama-3-70b` |
+| `--model_path` | Local folder to download/search the model (empty = default Hugging Face cache) | `./models` |
 | `--constitution_path` | JSON file with constitution | `constitutions/constitution_anthropic.json` |
+| `--output_dir` | Output directory (empty = directory of the constitution file) | `outputs` |
+| `--red_teaming_parquet` | Parquet file with prompts (`text` column) | `""` |
+| `--red_prompts_path` | Text file with prompts, one per line | `""` |
 | `--max_samples` | Maximum number of samples (-1 = all) | `128` |
-| `--batch_size` | Batch size for vLLM | `32` |
-| `--gpus` | GPUs to use (e.g., "0,1,2") | `"4,5,6,7"` |
+| `--batch_size` | Prompts per vLLM batch | `32` |
+| `--max_new_tokens` | Maximum tokens to generate | `1500` |
+| `--max_model_len` | Maximum model context length | `8192` |
 | `--temperature` | Sampling temperature | `0.8` |
 | `--top_p` | Top-p for sampling | `0.95` |
-| `--max_new_tokens` | Maximum tokens to generate | `1500` |
+| `--top_k` | Top-k for sampling (0 = disabled) | `20` |
+| `--gpus` | GPUs to use (e.g., "0,1,2") | `"0"` |
+| `--tensor_parallel_size` | Tensor parallel size (0 = number of GPUs in `--gpus`) | `0` |
 | `--gpu_memory_utilization` | GPU memory fraction | `0.90` |
-| `--red_teaming_parquet` | Parquet file with prompts | `""` |
+| `--seed` | Random seed | `42` |
+
+Prompt source precedence: `--red_teaming_parquet` (if the file exists), then
+`--red_prompts_path`, then the 20 built-in prompts defined in `config.py`.
 
 ## File Formats
 
@@ -137,17 +147,22 @@ python main.py \
     }
   ],
   "few_shot_examples": [
-    {
-      "init_prompt": "Example prompt...",
-      "init_response": "Initial response...",
-      "critic_prompt": "Example critique...",
-      "critic_response": "Critical analysis...",
-      "revision_prompt": "Revision prompt...",
-      "revision_response": "Improved response..."
-    }
+    [
+      {"role": "user", "content": "Example red-teaming prompt..."},
+      {"role": "assistant", "content": "Initial response..."},
+      {"role": "user", "content": "Critique request..."},
+      {"role": "assistant", "content": "Critique..."},
+      {"role": "user", "content": "Revision request..."},
+      {"role": "assistant", "content": "Revised response..."}
+    ]
   ]
 }
 ```
+
+`constitutions` is required and must be a non-empty list; each entry needs non-empty
+string `critic` and `revision` fields. `few_shot_examples` is optional. When present,
+it is a list of conversations, and each conversation is a list of messages with a
+`role` (`user`, `assistant` or `system`) and a string `content`.
 
 ### Input Dataset (Parquet)
 
@@ -168,11 +183,13 @@ df.to_parquet('prompts.parquet')
 
 ## Output Files
 
-The pipeline generates multiple files in the `constitution_examples/` directory:
+The pipeline writes two files to the `exps/` subdirectory of `--output_dir` (default
+`outputs/exps/`). The directory is created if needed. File names use the base name of
+the constitution file and a Unix timestamp:
 
-1. **`{model}_{timestamp}.json`** - Extended constitution with complete results
-2. **`{model}_{timestamp}.jsonl`** - Line-by-line dataset with individual fields
-3. **`{model}_{timestamp}.parquet`** - Structured dataset with columns:
+1. **`<constitution_name>_<timestamp>.json`** - Copy of the constitution extended with a
+   `system_chat` key that holds the full conversations (few-shot examples included)
+2. **`<constitution_name>_<timestamp>.parquet`** - Structured dataset with the columns below
 
 ### Final Dataset Columns
 
@@ -185,8 +202,8 @@ The pipeline generates multiple files in the `constitution_examples/` directory:
 - `revision_response` - Final improved response
 
 **Training fields:**
-- `prompt` - Formatted conversation
-- `messages` - Message list for chat
+- `prompt` - Initial red-teaming prompt (same value as `init_prompt`)
+- `messages` - The six-turn conversation (prompt, initial response, critique request, critique, revision request, revised response), without few-shot examples
 - `chosen` - Revised response (preferred)
 - `rejected` - Initial response (not preferred)
 
@@ -272,21 +289,23 @@ python main.py \
 
 ## Ethical Considerations
 
+The red-teaming prompts in this project are harmful by design, and the datasets it
+produces contain harmful text. The default model (`dphn/dolphin-2.9.1-llama-3-70b`) is
+uncensored, and the other listed models are abliterated (refusal behavior removed), on purpose. Constitutional AI needs an initial answer that actually exhibits the
+problem so that the critique and revision steps have something to correct; a model that
+refuses at the first step would yield no useful critique/revision pair. The bundled
+few-shot examples also include harmful initial answers for the same reason. The
+`rejected` column of the output is therefore expected to contain harmful content, and the `chosen`
+column holds the revised answer, which is model-generated and not guaranteed to be safe.
+Review the outputs before using them for training or sharing them, and use the pipeline
+only for safety research and model improvement.
+
 ## Production Notes
 
 - The pipeline validates all critical arguments at startup (paths, sampling ranges, GPU config).
 - If no red-teaming prompts are available after filtering, execution fails fast with a clear error.
 - Output files are always written under `output_dir/exps/` with timestamped names.
 - Install from `pyproject.toml` to ensure compatible dependency versions.
-
-This pipeline is specifically designed to:
-
-- **Improve safety** of language models
-- **Reduce harmful content** through constitutional critique
-- **Generate high-quality datasets** for ethical training
-- **Implement best practices** of responsible AI
-
-**Warning**: Red-teaming prompts may contain sensitive content. Use only for research and model improvement.
 
 ## Contributing
 
