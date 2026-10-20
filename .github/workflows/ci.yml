@@ -1,0 +1,32 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      # Only the packages the tests import. vLLM is not needed because the tests
+      # cover modules that do not import it (utils, config, data_handler).
+      - name: Install test dependencies
+        run: python -m pip install pytest pandas pyarrow ruff
+
+      # Lint is limited to tests/ for now: the existing modules have not been
+      # cleaned up against the ruff defaults yet.
+      - name: Lint tests
+        run: ruff check tests
+
+      - name: Run tests
+        run: python -m pytest -q
