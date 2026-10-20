@@ -7,7 +7,7 @@ name = "constitutional-ai-data-pipeline"
 version = "0.1.0"
 description = "Pipeline de datos para Constitutional AI inspirado en Hugging Face - genera datasets SFT y de preferencias"
 authors = [
-    {name = "Gonzalo Fuentes", email = "gonzalo.fuentes@example.com"}
+    {name = "Gonzalo Fuentes"}
 ]
 readme = "README.md"
 license = "Apache-2.0"
